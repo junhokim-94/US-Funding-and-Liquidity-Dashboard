@@ -1,0 +1,35 @@
+[build-system]
+requires = ["setuptools>=69", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "funding-dashboard-v2"
+version = "2.1.0"
+description = "U.S. money-market funding and liquidity analytics pipeline"
+requires-python = ">=3.10"
+dependencies = [
+  "pandas>=2.2,<3",
+  "numpy>=1.26,<3",
+  "requests>=2.32,<3",
+  "requests-cache>=1.2,<2",
+  "tenacity>=8.2,<10",
+  "PyYAML>=6.0,<7",
+  "duckdb>=1.1,<2",
+  "python-dotenv>=1.0,<2",
+  "beautifulsoup4>=4.12,<5",
+  "pyarrow>=17,<22",
+  "boto3>=1.34,<2"
+]
+
+[project.optional-dependencies]
+dashboard = ["streamlit>=1.42,<2", "plotly>=5.24,<7"]
+dev = ["pytest>=8,<10"]
+
+[project.scripts]
+funding-dashboard = "funding_dashboard.main:cli"
+
+[tool.setuptools]
+package-dir = {"" = "src"}
+
+[tool.setuptools.packages.find]
+where = ["src"]

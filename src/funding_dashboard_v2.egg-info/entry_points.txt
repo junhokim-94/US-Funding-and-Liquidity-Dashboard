@@ -1,0 +1,2 @@
+[console_scripts]
+funding-dashboard = funding_dashboard.main:cli

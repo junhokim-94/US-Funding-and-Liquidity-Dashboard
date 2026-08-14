@@ -1,0 +1,21 @@
+Metadata-Version: 2.4
+Name: funding-dashboard-v2
+Version: 2.1.0
+Summary: U.S. money-market funding and liquidity analytics pipeline
+Requires-Python: >=3.10
+Requires-Dist: pandas<3,>=2.2
+Requires-Dist: numpy<3,>=1.26
+Requires-Dist: requests<3,>=2.32
+Requires-Dist: requests-cache<2,>=1.2
+Requires-Dist: tenacity<10,>=8.2
+Requires-Dist: PyYAML<7,>=6.0
+Requires-Dist: duckdb<2,>=1.1
+Requires-Dist: python-dotenv<2,>=1.0
+Requires-Dist: beautifulsoup4<5,>=4.12
+Requires-Dist: pyarrow<22,>=17
+Requires-Dist: boto3<2,>=1.34
+Provides-Extra: dashboard
+Requires-Dist: streamlit<2,>=1.42; extra == "dashboard"
+Requires-Dist: plotly<7,>=5.24; extra == "dashboard"
+Provides-Extra: dev
+Requires-Dist: pytest<10,>=8; extra == "dev"

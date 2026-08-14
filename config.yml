@@ -1,0 +1,192 @@
+project:
+  start_date: "2018-04-01"
+  database: "data/funding.duckdb"
+  cache_dir: "data/http_cache"
+  output_dir: "data/outputs"
+  staging_dir: "data/staging"
+  run_metadata_dir: "data/run_metadata"
+  lookback_days: 45
+
+http:
+  timeout_seconds: 30
+  max_retries: 5
+  backoff_seconds: 1.0
+  min_seconds_between_requests: 0.15
+
+validation:
+  rate_min_percent: -5.0
+  rate_max_percent: 30.0
+  fail_on_duplicate_rows: true
+  fail_on_missing_required_values: true
+  stale_daily_days: 10
+  stale_weekly_days: 21
+  stale_monthly_days: 62
+  fail_on_any_stale: false
+  fail_on_critical_stale: true
+  critical_series:
+    - SOFR_RATE
+    - TGCR_RATE
+    - IORB
+    - WRESBAL
+    - WTREGEN
+    - RRPONTSYD
+
+publication:
+  output_mode: "local"
+  s3_prefix: ""
+
+sources:
+  nyfed:
+    enabled: true
+    required: true
+    max_days_per_request: 365
+  fred:
+    enabled: true
+    required: true
+    fail_on_any_series_error: true
+    series:
+      IORB: "Interest on reserve balances"
+      IOER: "Interest rate on excess reserves (pre-IORB history)"
+      WRESBAL: "Reserve balances with Federal Reserve Banks"
+      WTREGEN: "Treasury General Account"
+      RRPONTSYD: "ON RRP usage"
+      WALCL: "Federal Reserve total assets"
+      TLAACBW027SBOG: "Total assets at commercial banks"
+      WLCFLPCL: "Federal Reserve primary credit outstanding"
+      H41RESPPALDKNWW: "Bank Term Funding Program outstanding"
+      DGS1MO: "1-month Treasury constant maturity"
+      DGS3MO: "3-month Treasury constant maturity"
+      DTB4WK: "4-week Treasury bill secondary-market rate"
+      DTB3: "3-month Treasury bill secondary-market rate"
+      DCPF1M: "30-day AA financial commercial paper"
+      DCPF3M: "90-day AA financial commercial paper"
+      DCPN30: "30-day AA nonfinancial commercial paper"
+      DCPN3M: "90-day AA nonfinancial commercial paper"
+      RIFSPPNA2P2D30NB: "30-day A2/P2 nonfinancial commercial paper"
+      RIFSPPNA2P2D90NB: "90-day A2/P2 nonfinancial commercial paper"
+      FINCP: "Financial commercial paper outstanding"
+      NFINCP: "Nonfinancial commercial paper outstanding"
+      LTDACBW027NBOG: "Large time deposits at commercial banks"
+  ofr:
+    enabled: true
+    required: true
+    datasets:
+      - fnyr
+      - repo
+      - mmf
+      - nypd
+      - tyld
+    hedge_fund_datasets:
+      - ficc
+  treasury:
+    enabled: true
+    required: true
+    days_forward: 45
+    days_back: 90
+
+ofr_rules:
+  repo_dvp_overnight_volume:
+    dataset: repo
+    # Prefer OFR-reviewed final observations, then extend the current quarter
+    # with the daily preliminary vintage.
+    mnemonics: ["REPO-DVP_TV_OO-F", "REPO-DVP_TV_OO-P"]
+  repo_gcf_overnight_volume:
+    dataset: repo
+    mnemonics: ["REPO-GCF_TV_OO-F", "REPO-GCF_TV_OO-P"]
+  repo_triparty_overnight_volume:
+    dataset: repo
+    mnemonics: ["REPO-TRIV1_TV_OO-F", "REPO-TRIV1_TV_OO-P"]
+  repo_term_volume:
+    dataset: repo
+    include_all: ["Volume", "Term"]
+    exclude: ["Preliminary"]
+  # OFR's public MMF dataset is an aggregate investment dataset. It does not
+  # contain the fund-type/WAM/WAL fields that the former fuzzy rules expected.
+  # Use exact published mnemonics and label the result as an allocation proxy.
+  mmf_total_investments:
+    dataset: mmf
+    mnemonic: "MMF-MMF_TOT-M"
+  mmf_repo_investments:
+    dataset: mmf
+    mnemonic: "MMF-MMF_RP_TOT-M"
+  mmf_treasury_investments:
+    dataset: mmf
+    mnemonic: "MMF-MMF_T_TOT-M"
+  mmf_bank_related_assets:
+    dataset: mmf
+    mnemonic: "MMF-MMF_BRA_TOT-M"
+  mmf_cd_allocation:
+    dataset: mmf
+    include_any: ["Certificate of Deposit", "Certificates of Deposit", "CD"]
+    include_all: ["Investment"]
+    exclude: ["Rate", "Maturity"]
+  mmf_cp_allocation:
+    dataset: mmf
+    include_all: ["Commercial Paper", "Investment"]
+    exclude: ["Rate", "Maturity"]
+  dealer_repo:
+    dataset: nypd
+    include_all: ["Repo"]
+    include_any: ["Treasury", "Total"]
+    exclude: ["Reverse", "Fails", "Rate"]
+  dealer_reverse_repo:
+    dataset: nypd
+    include_all: ["Reverse Repo"]
+    include_any: ["Treasury", "Total"]
+    exclude: ["Fails", "Rate"]
+  dealer_fails_to_deliver:
+    dataset: nypd
+    mnemonic: "NYPD-PD_AFtD_T-A"
+  dealer_fails_to_receive:
+    dataset: nypd
+    mnemonic: "NYPD-PD_AFtR_T-A"
+  sponsored_repo_volume:
+    dataset: ficc
+    mnemonic: "FICC-SPONSORED_REPO_VOL"
+  sponsored_reverse_repo_volume:
+    dataset: ficc
+    mnemonic: "FICC-SPONSORED_REVREPO_VOL"
+
+scoring:
+  weights:
+    unsecured_funding: 0.15
+    secured_repo: 0.20
+    dispersion_depth: 0.15
+    system_liquidity: 0.20
+    repo_intermediation: 0.10
+    mmf: 0.10
+    cp_cd: 0.10
+  rolling_window_days: 252
+  minimum_history_days: 60
+  winsor_z: 4.0
+  absolute_weight: 0.70
+  anomaly_weight: 0.30
+  anomaly_window_days: 1260
+  anomaly_minimum_history_days: 252
+  system_facility_stress_override: true
+  confirmed_stress_components: [system_liquidity, cp_cd]
+  confirmed_stress_floor_strength: 0.25
+  regime_thresholds: [25, 40, 55, 70]
+  absolute_thresholds:
+    # Negative spreads to IORB indicate tightening, but not outright funding
+    # stress. Stressed scores require the rate to reach or exceed IORB, while
+    # positive spreads retain strong sensitivity to the 2019/2020 episodes.
+    EFFR_ADMIN_BP: [[-15, 5], [-10, 10], [-7, 20], [-3, 30], [0, 50], [5, 80], [10, 95], [20, 100]]
+    OBFR_ADMIN_BP: [[-20, 5], [-12, 10], [-8, 20], [-4, 30], [0, 50], [5, 80], [10, 95], [15, 100]]
+    SOFR_ADMIN_BP: [[-25, 5], [-15, 10], [-8, 20], [0, 50], [10, 70], [25, 85], [50, 95], [100, 100]]
+    TGCR_ADMIN_BP: [[-25, 5], [-15, 10], [-8, 20], [0, 50], [10, 70], [25, 85], [50, 95], [100, 100]]
+    SOFR_TGCR_BP: [[0, 10], [2, 20], [5, 40], [10, 65], [20, 85], [50, 100]]
+    SOFR_IQR_BP: [[0, 5], [5, 15], [10, 30], [20, 55], [40, 80], [80, 100]]
+    SOFR_UPPER_TAIL_BP: [[5, 5], [15, 20], [30, 40], [75, 65], [150, 85], [300, 100]]
+    TGCR_IQR_BP: [[0, 5], [2, 15], [5, 30], [10, 50], [25, 80], [50, 100]]
+    WRESBAL_21D_CHG_PCT_BANK_ASSETS: [[-2.0, 100], [-1.25, 85], [-0.75, 70], [-0.25, 45], [0, 20], [1.0, 5]]
+    WTREGEN_21D_CHG_PCT_BANK_ASSETS: [[-1.0, 5], [0, 15], [0.25, 35], [0.50, 60], [0.75, 80], [1.25, 100]]
+    PRIMARY_CREDIT_PCT_BANK_ASSETS: [[0, 0], [0.01, 20], [0.05, 40], [0.10, 60], [0.25, 80], [0.50, 90], [1.0, 100]]
+    BTFP_PCT_BANK_ASSETS: [[0, 0], [0.01, 25], [0.10, 55], [0.25, 75], [0.50, 90], [1.0, 100]]
+    A2P2_AA_1M_BP: [[0, 5], [20, 15], [40, 30], [60, 50], [100, 70], [150, 85], [250, 100]]
+    A2P2_AA_3M_BP: [[0, 5], [20, 15], [40, 30], [60, 50], [100, 70], [150, 85], [250, 100]]
+    AA_FIN_CP_3M_TSY_BP: [[-25, 5], [0, 15], [25, 30], [50, 50], [100, 70], [175, 90], [250, 100]]
+    AA_NONFIN_CP_3M_TSY_BP: [[-25, 5], [0, 15], [25, 30], [50, 50], [100, 70], [175, 90], [250, 100]]
+    FINCP_21D_CHG_PCT: [[-20, 100], [-15, 90], [-10, 75], [-5, 50], [0, 20], [5, 5]]
+    NFINCP_21D_CHG_PCT: [[-20, 100], [-15, 90], [-10, 75], [-5, 50], [0, 20], [5, 5]]
+    LTDACBW027NBOG_21D_CHG_PCT: [[-6, 100], [-4, 85], [-2, 60], [-1, 40], [0, 20], [3, 5]]
