@@ -1,5 +1,9 @@
 # U.S. Funding & Liquidity Dashboard v2
 
+### [▶ View Live Dashboard](https://us-funding-and-liquidity-dashboard-nw7qc47biajppe5mkftgq9.streamlit.app/)
+
+[![U.S. Funding & Liquidity Dashboard](dashboard.png)](https://us-funding-and-liquidity-dashboard-nw7qc47biajppe5mkftgq9.streamlit.app/)
+
 This version expands the original SOFR–IORB / TGA / reserves monitor into a broader money-market dashboard.
 
 
